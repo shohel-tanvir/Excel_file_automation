@@ -3,7 +3,6 @@ from openpyxl import load_workbook
 from selenium import webdriver
 from selenium.webdriver.chrome.service import Service
 from selenium.webdriver.chrome.options import Options
-from selenium.webdriver.common.by import By
 import time
 
 chrome_options = Options()
@@ -17,7 +16,7 @@ driver = webdriver.Chrome(service=service, options=chrome_options)
 
 today=datetime.datetime.now()
 day_name=today.strftime("%A")
-print(day_name)
+print("Today is " + day_name)
 # Open the Excel workbook
 wb = load_workbook('excel_file.xlsx')  # Update with your Excel file path
 
@@ -25,43 +24,48 @@ wb = load_workbook('excel_file.xlsx')  # Update with your Excel file path
 longest_option = ""
 shortest_option = None
 
-# Function to perform a Google search and get the suggestions
-def google_search(keyword):
-    global longest_option, shortest_option  # Declare these variables as global
+def get_google_suggestions(keyword):
+    # Open Google
     driver.get('https://www.google.com/?hl=en')
-    search_box = driver.find_element(By.NAME, 'q')
+    # Find the search box
+    search_box = driver.find_element('name', 'q')
+    # Type the keyword in the search box
     search_box.send_keys(keyword)
-    time.sleep(3)  # Wait for the suggestions to load
+    # Wait for suggestions to load
+    time.sleep(2)  # Adjust as needed depending on your internet speed
 
-    # Retrieve the search suggestions
-    suggestions = driver.find_elements(By.CSS_SELECTOR, 'li span')
+    suggestions = driver.find_elements('css selector', 'li.sbct.PZPZlf')
+    # Extract the text from each suggestion
+    suggestion_texts = [suggestion.text.strip() for suggestion in suggestions if suggestion.text.strip()]
 
-    # Loop through the suggestions to find the longest and shortest options
-    for suggestion in suggestions:
-        option_text = suggestion.text.strip()
-        if not option_text:
-            continue
+    return suggestion_texts
 
-        if len(option_text) > len(longest_option):
-            longest_option = option_text
+def find_longest_shortest(suggestions):
+    if not suggestions:
+        return None, None
 
-        if shortest_option is None or len(option_text) < len(shortest_option):
-            shortest_option = option_text
-
+    longest = max(suggestions, key=len)
+    shortest = min(suggestions, key=len)
+    return longest, shortest
 
 sheet=wb[day_name]
-print(sheet)
+print(f"Sheet name is : {sheet}")
 for row in range(2, sheet.max_row + 1):  # Assuming data starts from the second row
     keyword = sheet.cell(row=row, column=1).value
     if keyword:
-        google_search(keyword)
+        get_google_suggestions(keyword)
+        # Get suggestions
+        suggestions = get_google_suggestions(keyword)
 
-            # Output the results
+    # Find and print the longest and shortest suggestion
+    longest, shortest = find_longest_shortest(suggestions)
+
+    # Output the results
     print(keyword)
-    sheet.cell(row=row, column=2).value = longest_option
-    sheet.cell(row=row, column=3).value = shortest_option
-# Save the updated Excel workbook
-wb.save('excel_file.xlsx')
+    print("Longest Suggestion:", longest if longest else "No valid suggestion found")
+    print("Shortest Suggestion:", shortest if shortest else "No valid suggestion found")
+    sheet.cell(row=row, column=2).value = longest
+    sheet.cell(row=row, column=3).value = shortest
 
-# Close the browser
+wb.save('excel_file.xlsx')
 driver.quit()
